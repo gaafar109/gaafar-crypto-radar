@@ -28,6 +28,17 @@ const data=[
 {name:"XRP",symbol:"XRP",market:"Spot",price:"—",change:"—"},
 {name:"Alpha watchlist",symbol:"ALPHA",market:"Alpha",price:"—",change:"—"}
 ];
+async function getBinancePrice() {
+  const response = await fetch(
+    "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+  );
+  if (!response.ok) throw new Error("Binance request failed");
+  const result = await response.json();
+  return Number(result.price);
+}
+getBinancePrice()
+ .then(price => alert("BTC/USDT: $" + price))
+  .catch(error => console.error("Binance error:", error));
 let market="Spot";
 function render(){const q=document.getElementById("search").value.toLowerCase();const list=data.filter(c=>(market==="All"||c.market===market)&&(c.name.toLowerCase().includes(q)||c.symbol.toLowerCase().includes(q)));document.getElementById("coins").innerHTML=list.length?list.map(c=>'<tr><td><div class="coin">'+c.name+'</div><div class="symbol">'+c.symbol+'</div></td><td>'+c.market+'</td><td>'+c.price+'</td><td>'+c.change+'</td></tr>').join(""):'<tr><td colspan="4" class="empty">No matching assets</td></tr>'}
 document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");market=b.dataset.market;render()}));
