@@ -5,7 +5,7 @@
 // Only the scheduler writes trading-observation state. Webhooks write a mailbox.
 // KV is eventually consistent: queued setting changes can take an extra cycle.
 // No exchange credentials, trading or artificial prices. Alpha source: Binance via Google.
-const VERSION = '2026-10-16.1';
+const VERSION = '2026-10-16.2';
 const BASE = 'https://gaafarypto.mohammed-gaafar.workers.dev';
 const SPOTS = ['https://data-api.binance.vision', 'https://api.binance.com', 'https://api-gcp.binance.com'];
 const ALPHA = 'https://www.binance.com/bapi/defi/v1/public/alpha-trade';
@@ -123,6 +123,20 @@ async function relayAlpha(env,path) {
   if(b.body?.code!=='000000'||b.body?.success===false)throw Error('رد Binance عبر الوصلة غير صالح');
   return b.body;
 }
+export async function diagnoseSpot() {
+  const host='https://data-api.binance.vision';
+  const lines=['فحص Binance Spot — مصدر بيانات السوق الرسمي', 'المصدر: '+host];
+  try {
+    const rows=await getJSON(host+'/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=100');
+    const a=analyze(rows,Date.now(),'15m');
+    lines.push('شموع BTCUSDT: نجحت', 'آخر إغلاق: '+fmt(a.price), 'وقت الإغلاق UTC: '+new Date(a.stamp).toISOString());
+    const p=await getJSON(host+'/api/v3/ticker/price?symbol=BTCUSDT');
+    if(p?.symbol!=='BTCUSDT'||!Number.isFinite(+p.price)||+p.price<=0)throw Error('سعر غير صالح');
+    lines.push('آخر سعر تداول: '+fmt(p.price)+' USDT', 'السعر والشموع نجحا؛ لا يثبت تنفيذ صفقات.');
+  } catch(e) {lines.push('فشل المصدر: '+e.message);}
+  return lines.join('\n');
+}
+
 function sourceClient(env) {
   const failed=new Map();let chosen=null,spotBlocked=null;
   async function spot(path) {
@@ -132,7 +146,7 @@ function sourceClient(env) {
     for(const host of hosts){
       if(failed.has(host)){errors.push(failed.get(host));continue;}
       try{const b=await getJSON(host+path);chosen=host;return b;}
-      catch(e){if([418,429,451].includes(e.status)){spotBlocked=e;throw e;}if(e.status===400)throw e;failed.set(host,e.message);errors.push(e.message);}
+      catch(e){if([418,429,451].includes(e.status)){spotBlocked=new MarketError([...errors,e.message].join(' | '),e.status);throw spotBlocked;}if(e.status===400)throw e;failed.set(host,e.message);errors.push(e.message);}
     }
     throw Error('سبوت غير متاح من الاستضافة: '+errors.join(' | '));
   }
@@ -158,7 +172,7 @@ function describe(m,s,a) {
   const levels=a.signal?`\nدخول مرجعي: ${fmt(a.price)}\nمستوى إعادة اختبار بعد الاختراق: ${fmt(a.entry2)}؛ دخول مشروط بتأكيد جديد غير منفذ\nوقف أولي: ${fmt(a.stop)}\nأهداف: ${a.targets.map(fmt).join(' / ')}`:'\nلا إشارة دخول الآن؛ لن تُعرض أهداف ووقف كخطة صفقة حتى تتحقق الشروط.';
   return `${a.signal?'🔔 شروط إشارة تجريبية متحققة':'📊 تحليل؛ شروط الإشارة غير متحققة'} ${m.toUpperCase()} ${s}\nآخر إغلاق: ${fmt(a.price)} USDT\nRSI: ${a.rs.toFixed(1)}\nدعم: ${fmt(a.support)}\nمقاومة: ${fmt(a.resistance)}${levels}\nحجم الشمعة USDT: ${fmt(a.quoteVolume)}\nوقت الإغلاق UTC: ${new Date(a.stamp).toISOString()}\nقواعد تجريبية؛ لا تنفيذ أو ضمان ربح. الدخول الثاني غير محسوب في المتابعة. الحجم لا يثبت سيولة دفتر الأوامر.`;
 }
-const HELP=`Gaafarypto — Spot وAlpha\n/price ALPHA_1156USDT alpha — لقطة آخر سعر تداول\n/status حالة التشغيل\n/diagnose فحص اتصال ألفا\n/analyze BTCUSDT spot\n/analyze ALPHA_175USDT alpha\n/frame 15m أو 1h أو 4h\n/market both أو spot أو alpha\n/pause إيقاف إشارات جديدة\n/resume استئناف\n/history نتائج رصد الشموع\n/alert BTCUSDT spot 100000 above\n/alerts قائمة التنبيهات\n/clearalerts حذف التنبيهات\nالتحليل والحالة مباشرة عبر Webhook. تغييرات الإعدادات والتنبيهات تُطبق بدورة الفحص بعد رسالة تأكيد، وقد تتأخر دورة إضافية.\nلا تداول تلقائي ولا فلتر شرعي.`;
+const HELP=`Gaafarypto — Spot وAlpha\n/price ALPHA_1156USDT alpha — لقطة آخر سعر تداول\n/status حالة التشغيل\n/diagnosespot فحص مصدر سبوت الرسمي\n/diagnose فحص اتصال ألفا\n/analyze BTCUSDT spot\n/analyze ALPHA_175USDT alpha\n/frame 15m أو 1h أو 4h\n/market both أو spot أو alpha\n/pause إيقاف إشارات جديدة\n/resume استئناف\n/history نتائج رصد الشموع\n/alert BTCUSDT spot 100000 above\n/alerts قائمة التنبيهات\n/clearalerts حذف التنبيهات\nالتحليل والحالة مباشرة عبر Webhook. تغييرات الإعدادات والتنبيهات تُطبق بدورة الفحص بعد رسالة تأكيد، وقد تتأخر دورة إضافية.\nلا تداول تلقائي ولا فلتر شرعي.`;
 function parse(text){const [raw='',...args]=String(text||'').trim().split(/\s+/);return {cmd:raw.split('@')[0].toLowerCase(),args};}
 function mutation(cmd,args) {
   if(cmd==='/adduser'||cmd==='/removeuser'){
@@ -181,6 +195,7 @@ async function reply(env,text,viewer=String(env.OWNER_CHAT_ID).trim()) {
   if(cmd==='/users')return owner?'المستخدمون المضافون: '+((s.members||[]).join(' / ')||'لا يوجد')+'\nالحد الحالي 5 أشخاص غير المالك.':'إدارة المستخدمين للمالك فقط.';
   if(cmd==='/start'||cmd==='/help')return owner?HELP+'\n/adduser رقم المستخدم — السماح لشخص\n/removeuser رقم المستخدم — إلغاء السماح\n/users قائمة الأشخاص\n/id رقم حسابك\nالأشخاص المضافون يطلبون تحليلًا ويستقبلون الإشارات القادمة فقط. الإعدادات والتنبيهات السعرية الشخصية للمالك.':'Gaafarypto — تم السماح لحسابك.\n/analyze BTCUSDT spot\n/analyze ALPHA_1156USDT alpha\n/status حالة الفحص\n/history نتائج الرصد\n/id رقم حسابك\nتستقبل الإشارات الجديدة والمتابعة. التحكم في الإعدادات للمالك. لا شراء أو بيع فعلي ولا ضمان أرباح.';
   if(!owner&&!['/status','/history','/analyze','/price'].includes(cmd))return 'الأمر للمالك فقط. المتاح لك: /analyze و/status و/history و/id';
+  if(cmd==='/diagnosespot')return await diagnoseSpot();
   if(cmd==='/diagnose') {
     const lines=['فحص وصلة ألفا — '+VERSION,'المصدر: Binance Alpha عبر وصلة Google الخاصة بك.'];
     try {
