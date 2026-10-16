@@ -1,4 +1,4 @@
-import {writeFile} from 'node:fs/promises';
+import {writeFile, appendFile} from 'node:fs/promises';
 export function configFromExisting(settings, schedules, accountId) {
   const bindings=settings.bindings;
   if(!Array.isArray(bindings))throw Error('Existing Worker bindings unavailable');
@@ -17,9 +17,21 @@ export function configFromExisting(settings, schedules, accountId) {
     kv_namespaces:bindings.filter(b=>b.type==='kv_namespace').map(b=>({binding:b.name,id:b.namespace_id})),
     triggers:{crons:items.map(x=>x.cron)}};
 }
+export function credentials(env) {
+  const account=String(env.CLOUDFLARE_ACCOUNT_ID||'').trim();
+  const token=String(env.CLOUDFLARE_API_TOKEN||'').trim();
+  if(!account)throw Error('CLOUDFLARE_ACCOUNT_ID is missing');
+  if(!/^[a-f0-9]{32}$/i.test(account))throw Error('CLOUDFLARE_ACCOUNT_ID must contain exactly 32 hexadecimal characters; use the Account ID, not a URL or API token');
+  if(!token)throw Error('CLOUDFLARE_API_TOKEN is missing');
+  if(/[\s\x00-\x1f\x7f]/.test(token))throw Error('CLOUDFLARE_API_TOKEN contains internal whitespace or control characters; copy only the token');
+  return {account,token};
+}
 async function main(){
-  const account=process.env.CLOUDFLARE_ACCOUNT_ID, token=process.env.CLOUDFLARE_API_TOKEN;
-  if(!/^[a-f0-9]{32}$/i.test(account||'')||!token)throw Error('Add CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in GitHub Actions secrets');
+  const {account,token}=credentials(process.env);
+  if(process.env.GITHUB_ENV) {
+    console.log('::add-mask::'+token);
+    await appendFile(process.env.GITHUB_ENV,'CLOUDFLARE_ACCOUNT_ID='+account+'\nCLOUDFLARE_API_TOKEN='+token+'\n');
+  }
   const base='https://api.cloudflare.com/client/v4/accounts/'+account+'/workers/scripts/gaafarypto';
   async function read(path){
     const r=await fetch(base+path,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(20000)});
