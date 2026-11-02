@@ -1,5 +1,7 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {foldAt,hash,FRAMES,median,priorRegime} from './evaluate.mjs';
+import test from 'node:test';import assert from 'node:assert/strict';import {foldAt,hash,FRAMES,median,priorRegime,simulateATR} from './evaluate.mjs';
 test('calendar split purges full48h horizon',()=>{const d=86400000;assert.equal(foldAt(87*d,0,180*d),'train');assert.equal(foldAt(89*d,0,180*d),null);assert.equal(foldAt(90*d,0,180*d),'validation');assert.equal(foldAt(125*d,0,180*d),null);assert.equal(foldAt(126*d,0,180*d),'holdout');assert.equal(foldAt(179*d,0,180*d),null);assert.equal(foldAt(-1,0,180*d),null)});
 test('baseline hash deterministic',()=>{assert.equal(hash('ALPHA:5m:100'),hash('ALPHA:5m:100'));assert.notEqual(hash('ALPHA:5m:100'),hash('ALPHA:5m:101'));assert.equal(FRAMES['4h']/FRAMES['5m'],48)});
 test('median avoids input mutation',()=>{const a=[3,1,2,4];assert.equal(median(a),2.5);assert.deepEqual(a,[3,1,2,4]);assert.equal(median([]),null)});
 test('regime uses past closed prices only',()=>{const a=Array.from({length:30},()=>[0,0,0,0,1]);a[24][4]=1.1;assert.equal(priorRegime(a,25,3600000),'rising');a[25][4]=100;assert.equal(priorRegime(a,25,3600000),'rising');assert.equal(priorRegime(a,20,3600000),'unavailable')});
+
+test('ATR simulation keeps original indices and prevents overlap',()=>{const a=Array.from({length:50},(_,i)=>[i*3600000,1,1.01,.99,1,100,(i+1)*3600000-1,100]);const signals=[{entryIndex:20,entry:1},{entryIndex:21,entry:1}];const t=simulateATR(a,signals,{horizonBars:4,feeEachSide:0,slippageEachSide:0});assert.equal(t.length,1);assert.equal(t[0].entryIndex,20);assert.equal(t[0].exitIndex,23);assert.equal(t[0].reason,'timeout');assert.ok(Math.abs(t[0].stopFraction-.04)<1e-10)});
