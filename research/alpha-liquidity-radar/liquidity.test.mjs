@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {computeWarnings,confirmWarnings,simulate,summarize} from './liquidity.mjs';
+const rows=Array.from({length:65},(_,i)=>[i*60000,1,1.02,0.98,1,100,i*60000+59999,i===48?1000:100]);
+const w=computeWarnings(rows,{lookback:48,volRatio:2,compressionMax:0.1});
+assert.equal(w[0].warning,true);
+assert.equal(w[0].volumeRatio,10);
+assert.equal(w[1].warning,false);
+rows[49][4]=1.04;rows[49][2]=1.05;rows[50][1]=1.04;
+const s=confirmWarnings(rows,w,{expiryBars:5});
+assert.equal(s[0].entryIndex,50);
+rows[50][3]=0.98;rows[50][2]=1.20;
+const t=simulate(rows,s,{horizonBars:1});
+assert.equal(t[0].reason,'stop');
+assert.equal(summarize(t).evaluable,1);
+console.log('All research unit tests passed');
