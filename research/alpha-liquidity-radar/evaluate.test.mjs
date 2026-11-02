@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {foldAt,hash,FRAMES,median,priorRegime} from './evaluate.mjs';
+test('calendar split purges full48h horizon',()=>{const d=86400000;assert.equal(foldAt(87*d,0,180*d),'train');assert.equal(foldAt(89*d,0,180*d),null);assert.equal(foldAt(90*d,0,180*d),'validation');assert.equal(foldAt(125*d,0,180*d),null);assert.equal(foldAt(126*d,0,180*d),'holdout');assert.equal(foldAt(179*d,0,180*d),null);assert.equal(foldAt(-1,0,180*d),null)});
+test('baseline hash deterministic',()=>{assert.equal(hash('ALPHA:5m:100'),hash('ALPHA:5m:100'));assert.notEqual(hash('ALPHA:5m:100'),hash('ALPHA:5m:101'));assert.equal(FRAMES['4h']/FRAMES['5m'],48)});
+test('median avoids input mutation',()=>{const a=[3,1,2,4];assert.equal(median(a),2.5);assert.deepEqual(a,[3,1,2,4]);assert.equal(median([]),null)});
+test('regime uses past closed prices only',()=>{const a=Array.from({length:30},()=>[0,0,0,0,1]);a[24][4]=1.1;assert.equal(priorRegime(a,25,3600000),'rising');a[25][4]=100;assert.equal(priorRegime(a,25,3600000),'rising');assert.equal(priorRegime(a,20,3600000),'unavailable')});
