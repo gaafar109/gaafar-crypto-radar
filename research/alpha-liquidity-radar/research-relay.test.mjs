@@ -42,3 +42,8 @@ test('returns upstream HTTP error without pretending success',()=>{
 test('rejects invalid JSON upstream',()=>{
  const h=harness({body:'not json'});assert.equal(h.send(good).error,'upstream_not_json');
 });
+
+test('rejects Binance application errors carried by HTTP 200',()=>{
+ const h=harness({body:'{"code":"-1000","msg":"upstream failure","data":null}'});
+ assert.equal(h.send(good).error,'upstream_application_error');
+});
