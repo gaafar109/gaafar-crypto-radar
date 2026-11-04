@@ -27,7 +27,7 @@ function doPost(e) {
     if(!/^ALPHA_[0-9]+USDT$/.test(symbol))
       return researchReply({ok:false,error:'invalid symbol'});
     const limit=Number(request.limit===undefined?100:request.limit);
-    if(!Number.isInteger(limit)||limit<1||limit>1000)
+    if(!Number.isInteger(limit)|| (request.endpoint==='depth' ? ![5,10,20,50,100,500,1000].includes(limit) : limit<1||limit>1000))
       return researchReply({ok:false,error:'invalid limit'});
     const url=RESEARCH_ALPHA_BASE+endpoint+'?symbol='+encodeURIComponent(symbol)+'&limit='+limit;
     const response=UrlFetchApp.fetch(url,{muteHttpExceptions:true,followRedirects:false});
