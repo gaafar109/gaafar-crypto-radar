@@ -37,6 +37,8 @@ function doPost(e) {
     if(body.length>900000)return researchReply({ok:false,error:'response_too_large'});
     let parsed;
     try{parsed=JSON.parse(body)}catch(_){return researchReply({ok:false,error:'upstream_not_json'})}
+    if(!parsed || typeof parsed!=='object' || String(parsed.code)!=='000000' || parsed.data===undefined || parsed.data===null)
+      return researchReply({ok:false,error:'upstream_application_error'});
     return researchReply({ok:true,endpoint:request.endpoint,symbol,
       fetchedAt:new Date().toISOString(),source:'binance-alpha-research-relay',
       validation:'RAW_UNVERIFIED',body:parsed});
