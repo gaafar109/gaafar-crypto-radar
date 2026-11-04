@@ -1,7 +1,7 @@
 # Isolated Apps Script relay validation — 2026-11-04
 
 ## Outcome
-PARTIAL / BLOCKED — the separate relay was created and deployed, but no usable Binance market-data response was received. This is not a successful live liquidity feed, a validated trading strategy, or an end-to-end POST test.
+PARTIAL / BLOCKED — the separate relay was created and deployed, but no usable Binance market-data response was received. This is not a successful live liquidity feed, a validated trading strategy, or a successful authenticated end-to-end POST test.
 
 ## Deployed setup
 - Project: GAAFARYPTO Research Relay V2 - TEST
@@ -76,4 +76,20 @@ A later attempt to resume the project found the browser signed out; Google retur
 6. Full authenticated /exec POST roundtrip: NOT TESTED. MYSELF requires Google authentication in addition to the relay key; do not claim machine-client readiness.
 7. Production changes/signals: none.
 
-Next concrete work: restore an authorized Google session, test the private web-app HTTP roundtrip, and resolve upstream access through a supported Binance access path/support response. Re-test valid current symbols and schema only after real JSON succeeds. Keep RAW_UNVERIFIED and withhold net-buying metrics and signals until taker-side semantics have independent evidence. Do not weaken Google access settings, rotate secrets, replace production, or label the work complete merely to bypass these blockers.
+Next concrete work: resolve upstream access through a supported Binance access path/support response and then test a fully authenticated private web-app POST roundtrip. Re-test valid current symbols and schema only after real JSON succeeds. Keep RAW_UNVERIFIED and withhold net-buying metrics and signals until taker-side semantics have independent evidence. Do not weaken Google access settings, rotate secrets, replace production, or label the work complete merely to bypass these blockers.
+
+## Final follow-up — 2026-11-04 17:24 Africa/Cairo
+Google sign-in was successfully restored and the existing project reopened. No replacement project or secret was created. Added and ran editor-only runFinalConnectivityCheck; production version 1 remains unchanged.
+
+| UTC response time | Request | Actual result |
+|---|---|---|
+| 15:24:32.670Z | Binance exchangeInfo | HTTP 403, text/html, 118 characters |
+| 15:24:33.198Z | Binance aggTrades, ALPHA_175USDT, limit 10 | HTTP 403, text/html, 118 characters |
+| 15:24:33.452Z | Binance fullDepth, ALPHA_175USDT, limit 20 | HTTP 403, text/html, 118 characters |
+| 15:24:33.810Z | Real HTTP POST to deployed /exec, valid relay key, no Google session | HTTP 401, text/html; charset=utf-8, 7913 characters |
+
+These requests used Accept: application/json and disabled redirect following. Binance returned the same Forbidden HTML. The POST was sent by UrlFetchApp to the project's own deployment; the key remained inside the request body and was not logged. This is a real transport test, but Google authentication was deliberately absent, so it does not validate the handler through an authenticated HTTP request. The body length field called bytes in the helper is actually JavaScript string length; it is not a measured wire-byte count.
+
+A separate GET from the signed-in browser to the exact deployment URL rendered “Script function not found: doGet”. This demonstrates authenticated reachability of the deployment, not successful POST execution. It is expected because this relay only implements doPost; doGet was not added as an authentication bypass.
+
+Sanitized follow-up observations are preserved in the execution log and RESEARCH_FINAL_CONNECTIVITY. Final diagnosis separates two layers: Google rejects unauthenticated machine requests to MYSELF with 401; Binance independently rejects outbound market-data requests with 403. Changing Google sharing cannot resolve the Binance failure. No live payload, direction semantics, or net-buying metric is validated. Final acceptance remains BLOCKED for live-data operation; successful setup and recorded failure tests must not be represented as a working liquidity feed.
