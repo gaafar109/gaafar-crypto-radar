@@ -1,0 +1,19 @@
+name: Hybrid research unit tests
+on:
+  push:
+    branches: [research/alpha-liquidity-radar-v2]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test research features and replay
+        run: node --test research/alpha-liquidity-radar/*.test.mjs
